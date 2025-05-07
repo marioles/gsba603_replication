@@ -1,1 +1,5 @@
+dotenv==0.9.9
+matplotlib==3.10.1
 pandas==2.2.3
+scipy==1.15.2
+statsmodels==0.14.4

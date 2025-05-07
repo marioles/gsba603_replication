@@ -10,7 +10,7 @@ setup(
     version="0.1.0",
     description="Replication of Kinna, Samphantharak, Townsend and Vera-Cossio (2024).",
     long_description=readme,
-    author="Mario Morales",
+    author="Mario Morales and Vidhi Shah",
     author_email="mario@moralesalfaro.cl",
     url="https://github.com/marioles/methods",
     packages=find_packages(exclude=("tests", "docs"))
