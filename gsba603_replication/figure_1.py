@@ -153,7 +153,7 @@ def plot_from_data(ax, plot_df, dv, confidence_ls):
     ax.grid(True)
 
 
-def generate_sub_plot(ax, dv, result):
+def extract_values_from_result(result):
     regex_str = get_regex()
 
     raw_dd = {
@@ -164,6 +164,15 @@ def generate_sub_plot(ax, dv, result):
     extract_dd = {k: utils.extract_relevant_values(ss=ss, regex_str=regex_str) for k, ss in raw_dd.items()}
     concat_dd = {k: utils.append_baseline(ss=ss) for k, ss in extract_dd.items()}
     plot_df = pd.DataFrame(concat_dd)
+    return plot_df
+
+
+def generate_sub_plot(ax, dv, result=None, plot_df=None):
+    if plot_df is None:
+        if result is None:
+            msg = f"result is not defined!"
+            raise Exception(msg)
+        plot_df = extract_values_from_result(result=result)
 
     confidence_ls = utils.get_confidence_list()
     for confidence in confidence_ls:
@@ -190,10 +199,7 @@ def generate_plot(dependent_ls, result_dd):
     return fig
 
 
-def generate_figure_1():
-    read_df = utils.read_data()
-    df = pre_process_data(df=read_df)
-
+def get_dependent_list():
     dependent_ls = [
         "a_symptom",
         "tot_hhspend",
@@ -202,7 +208,10 @@ def generate_figure_1():
         "costs_nw_w",
         "REVnw_w",
     ]
+    return dependent_ls
 
+
+def construct_kwargs_dict(df):
     kwargs_dd = {
         "df": df,
         "tau": "tau",
@@ -211,6 +220,15 @@ def generate_figure_1():
         "fe": ["id", "month"],
         "control": ["Nm", "Nf", "headage", "mean_edu"],
     }
+    return kwargs_dd
+
+
+def generate_figure_1():
+    read_df = utils.read_data()
+    df = pre_process_data(df=read_df)
+
+    dependent_ls = get_dependent_list()
+    kwargs_dd = construct_kwargs_dict(df=df)
 
     result_dd = {dv: regress_diff_in_diff(dv=dv, **kwargs_dd) for dv in dependent_ls}
     panel_plot = generate_plot(dependent_ls=dependent_ls, result_dd=result_dd)
