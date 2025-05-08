@@ -250,6 +250,6 @@ def generate_plot(dependent_ls, result_dd):
 
 
 def export_plot(name, panel_plot):
-    export_path = utils._get_export_path()
+    export_path = utils.get_export_path()
     path = f"{export_path}/{name}"
     panel_plot.savefig(path)

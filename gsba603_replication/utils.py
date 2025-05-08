@@ -47,7 +47,7 @@ def _get_file_path():
     return file_path
 
 
-def _get_export_path():
+def get_export_path():
     export_path = os.getenv("EXPORT_PATH")
     return export_path
 
