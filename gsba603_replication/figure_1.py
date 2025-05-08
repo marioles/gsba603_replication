@@ -1,39 +1,10 @@
 import matplotlib.pyplot as plt
-import os
 import pandas as pd
 import re
 import scipy as sp
 import statsmodels.formula.api as smf
 
 from . import utils
-
-
-def _get_base_path():
-    base_path = os.getenv("BASE_PATH")
-    return base_path
-
-
-def _get_clean_data_path():
-    clean_path = os.getenv("CLEAN_PATH")
-    return clean_path
-
-
-def _get_file_path():
-    file_path = os.getenv("FILE_PATH")
-    return file_path
-
-
-def _get_export_path():
-    export_path = os.getenv("EXPORT_PATH")
-    return export_path
-
-
-def get_treat_file_path():
-    base_path = _get_base_path()
-    clean_path = _get_clean_data_path()
-    file_path = _get_file_path()
-    path = f"{base_path}/{clean_path}/{file_path}"
-    return path
 
 
 def filter_first_half_shock(df):
@@ -279,6 +250,6 @@ def generate_plot(dependent_ls, result_dd):
 
 
 def export_plot(name, panel_plot):
-    export_path = _get_export_path()
+    export_path = utils._get_export_path()
     path = f"{export_path}/{name}"
     panel_plot.savefig(path)

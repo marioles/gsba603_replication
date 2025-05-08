@@ -1,3 +1,6 @@
+import os
+
+
 def calculate_outcomes(df):
     df["exp_nf_w"] = df["exp_nf"].sub(df["tot_hhspend"], fill_value=0)
 
@@ -27,3 +30,31 @@ def filter_window(df, months=24):
     window_filter_ss = window_filter_ss & (df["tau"] < months)
     window_filter_df = df.loc[window_filter_ss].copy()
     return window_filter_df
+
+
+def _get_base_path():
+    base_path = os.getenv("BASE_PATH")
+    return base_path
+
+
+def _get_clean_data_path():
+    clean_path = os.getenv("CLEAN_PATH")
+    return clean_path
+
+
+def _get_file_path():
+    file_path = os.getenv("FILE_PATH")
+    return file_path
+
+
+def _get_export_path():
+    export_path = os.getenv("EXPORT_PATH")
+    return export_path
+
+
+def get_treat_file_path():
+    base_path = _get_base_path()
+    clean_path = _get_clean_data_path()
+    file_path = _get_file_path()
+    path = f"{base_path}/{clean_path}/{file_path}"
+    return path
