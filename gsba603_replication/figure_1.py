@@ -5,6 +5,8 @@ import re
 import scipy as sp
 import statsmodels.formula.api as smf
 
+from . import utils
+
 
 def _get_base_path():
     base_path = os.getenv("BASE_PATH")
@@ -34,54 +36,44 @@ def get_treat_file_path():
     return path
 
 
-def pre_process_data(df):
-    # Two-year analysis window
-    window_filter_ss = df["tau"] >= -24
-    window_filter_ss = window_filter_ss & (df["tau"] < 24)
-    window_filter_df = df.loc[window_filter_ss].copy()
+def filter_first_half_shock(df):
+    treatment_filter_ss = df["treatment_subsample"] == 1
+    treatment_filter_ss = treatment_filter_ss | (df["placebo_subsample"] == 2)
+    treatment_filter_df = df.loc[treatment_filter_ss].copy()
+    return treatment_filter_df
 
-    # Observations hit during first half but not yet treated
-    treatment_filter_ss = window_filter_df["treatment_subsample"] == 1
-    treatment_filter_ss = treatment_filter_ss | (window_filter_df["placebo_subsample"] == 2)
-    treatment_filter_df = window_filter_df.loc[treatment_filter_ss].copy()
 
-    # Recode tau
+def recode_tau(df):
+    recode_df = df.copy()
+
     bin_ls = [-25, -18, -12, -6, 0, 6, 12, 18, 24]
     label_ls = [-4, -3, -2, -1, 0, 1, 2, 3]
 
-    tau_ss = treatment_filter_df["tau"].copy()
-    treatment_filter_df["ttt"] = tau_ss
-    treatment_filter_df["tau"] = pd.cut(tau_ss, bins=bin_ls, labels=label_ls, right=False)
-    treatment_filter_df["tau"] = treatment_filter_df["tau"].astype(int)
+    tau_ss = recode_df["tau"].copy()
+    recode_df["ttt"] = tau_ss
+    recode_df["tau"] = pd.cut(tau_ss, bins=bin_ls, labels=label_ls, right=False)
+    recode_df["tau"] = recode_df["tau"].astype(int)
+    return recode_df
 
-    # Non-attritors filter
-    # TODO check column name, the original code uses "no_attri" which is not in the dataframe
-    attritor_filter_ss = treatment_filter_df["no_attrition_food"] == 1
-    attritor_filter_df = treatment_filter_df.loc[attritor_filter_ss].copy()
-    attritor_filter_df
+
+def pre_process_data(df):
+    # Two-year analysis window
+    window_filter_df = utils.filter_window(df=df, months=24)
+
+    # Observations hit during first half but not yet treated
+    treatment_filter_df = filter_first_half_shock(df=window_filter_df)
+
+    # Recode tau
+    recode_df = recode_tau(df=treatment_filter_df)
+
+    # No-attrition filter
+    filter_df = utils.filter_attrition(df=recode_df)
 
     # Calculations
-    attritor_filter_df["exp_nf_w"] = attritor_filter_df["exp_nf"].sub(attritor_filter_df["tot_hhspend"], fill_value=0)
+    filter_df = utils.calculate_outcomes(df=filter_df)
 
-    attritor_filter_df["tot_exp_w"] = attritor_filter_df["exp_nf_w"].add(attritor_filter_df["food_w"], fill_value=0)
-
-    attritor_filter_df["totcons_w"] = attritor_filter_df["exp_nf_w"].add(attritor_filter_df["tot_hhspend"],
-                                                                         fill_value=0)
-    attritor_filter_df["totcons_w"] = attritor_filter_df["totcons_w"].add(attritor_filter_df["food_w"], fill_value=0)
-
-    attritor_filter_df["costs_nw_w"] = attritor_filter_df["costs_ag_w"].add(attritor_filter_df["costs_livs_w"],
-                                                                            fill_value=0)
-    attritor_filter_df["costs_nw_w"] = attritor_filter_df["costs_nw_w"].add(attritor_filter_df["costs_fs_w"],
-                                                                            fill_value=0)
-    attritor_filter_df["costs_nw_w"] = attritor_filter_df["costs_nw_w"].add(attritor_filter_df["costs_nfbiz_w"],
-                                                                            fill_value=0)
-
-    attritor_filter_df["REVnw_w"] = attritor_filter_df["AgREV_w"].add(attritor_filter_df["LREV_w"], fill_value=0)
-    attritor_filter_df["REVnw_w"] = attritor_filter_df["REVnw_w"].add(attritor_filter_df["FSREV_w"], fill_value=0)
-    attritor_filter_df["REVnw_w"] = attritor_filter_df["REVnw_w"].add(attritor_filter_df["BREV_w"], fill_value=0)
-
-    attritor_filter_df["a_symptom"] = attritor_filter_df["n_symptom"].apply(lambda x: 1 if x > 0 else 0)
-    return attritor_filter_df
+    filter_df["a_symptom"] = filter_df["n_symptom"].apply(lambda x: 1 if x > 0 else 0)
+    return filter_df
 
 
 def regress_diff_in_diff(df, dv, tau, treatment, fe=None, control=None, clustvar=None):
