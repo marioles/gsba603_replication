@@ -1,4 +1,5 @@
 import os
+import pandas as pd
 
 
 def calculate_outcomes(df):
@@ -58,3 +59,9 @@ def get_treat_file_path():
     file_path = _get_file_path()
     path = f"{base_path}/{clean_path}/{file_path}"
     return path
+
+
+def read_data():
+    path = get_treat_file_path()
+    raw_df = pd.read_stata(path)
+    return raw_df

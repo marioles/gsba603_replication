@@ -253,9 +253,3 @@ def export_plot(name, panel_plot):
     export_path = utils.get_export_path()
     path = f"{export_path}/{name}"
     panel_plot.savefig(path)
-
-
-def read_data():
-    path = utils.get_treat_file_path()
-    raw_df = pd.read_stata(path)
-    return raw_df
