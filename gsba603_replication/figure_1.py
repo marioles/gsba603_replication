@@ -7,19 +7,6 @@ import statsmodels.formula.api as smf
 from . import utils
 
 
-def recode_tau(df):
-    recode_df = df.copy()
-
-    bin_ls = [-25, -18, -12, -6, 0, 6, 12, 18, 24]
-    label_ls = [-4, -3, -2, -1, 0, 1, 2, 3]
-
-    tau_ss = recode_df["tau"].copy()
-    recode_df["ttt"] = tau_ss
-    recode_df["tau"] = pd.cut(tau_ss, bins=bin_ls, labels=label_ls, right=False)
-    recode_df["tau"] = recode_df["tau"].astype(int)
-    return recode_df
-
-
 def pre_process_data(df):
     # Two-year analysis window
     window_filter_df = utils.filter_window(df=df, months=24)
@@ -28,7 +15,7 @@ def pre_process_data(df):
     treatment_filter_df = utils.filter_first_half_shock(df=window_filter_df)
 
     # Recode tau
-    recode_df = recode_tau(df=treatment_filter_df)
+    recode_df = utils.recode_tau(df=treatment_filter_df)
 
     # No-attrition filter
     filter_df = utils.filter_attrition(df=recode_df)
