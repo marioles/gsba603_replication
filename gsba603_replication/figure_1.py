@@ -7,13 +7,6 @@ import statsmodels.formula.api as smf
 from . import utils
 
 
-def filter_first_half_shock(df):
-    treatment_filter_ss = df["treatment_subsample"] == 1
-    treatment_filter_ss = treatment_filter_ss | (df["placebo_subsample"] == 2)
-    treatment_filter_df = df.loc[treatment_filter_ss].copy()
-    return treatment_filter_df
-
-
 def recode_tau(df):
     recode_df = df.copy()
 
@@ -32,7 +25,7 @@ def pre_process_data(df):
     window_filter_df = utils.filter_window(df=df, months=24)
 
     # Observations hit during first half but not yet treated
-    treatment_filter_df = filter_first_half_shock(df=window_filter_df)
+    treatment_filter_df = utils.filter_first_half_shock(df=window_filter_df)
 
     # Recode tau
     recode_df = recode_tau(df=treatment_filter_df)
@@ -42,8 +35,6 @@ def pre_process_data(df):
 
     # Calculations
     filter_df = utils.calculate_outcomes(df=filter_df)
-
-    filter_df["a_symptom"] = filter_df["n_symptom"].apply(lambda x: 1 if x > 0 else 0)
     return filter_df
 
 
@@ -84,7 +75,8 @@ def regress_diff_in_diff(df, dv, tau, treatment, fe=None, control=None, clustvar
         copy_df[clustvar] = pd.Categorical(copy_df[clustvar], ordered=True)
 
     # Create formula
-    formula = f"{dv} ~ C({tau_cat}, Treatment(reference=-1)) + {treatment} + C({tau_cat}, Treatment(reference=-1)):{treatment}"
+    formula = f"{dv} ~ C({tau_cat}, Treatment(reference=-1))"
+    formula = f"{formula} + {treatment} + C({tau_cat}, Treatment(reference=-1)):{treatment}"
     if isinstance(fe, list):
         fe_formula_ls = [f"C({i})" for i in fe]
         fe_formula = " + ".join(fe_formula_ls)
@@ -120,7 +112,7 @@ def get_regex():
     return regex_str
 
 
-def extract_revelant_values(ss, regex_str):
+def extract_relevant_values(ss, regex_str):
     filter_ss = ss.filter(regex=regex_str, axis=0)
     index_ls = list(filter_ss.index)
     reindex_ls = [re.match(regex_str, i).group(1) for i in index_ls]
@@ -212,7 +204,6 @@ def get_confidence_list():
 
 
 def generate_sub_plot(ax, dv, result):
-    param_ss = result.params
     regex_str = get_regex()
 
     raw_dd = {
@@ -220,7 +211,7 @@ def generate_sub_plot(ax, dv, result):
         "std_error": result.bse,
     }
 
-    extract_dd = {k: extract_revelant_values(ss=ss, regex_str=regex_str) for k, ss in raw_dd.items()}
+    extract_dd = {k: extract_relevant_values(ss=ss, regex_str=regex_str) for k, ss in raw_dd.items()}
     concat_dd = {k: append_baseline(ss=ss) for k, ss in extract_dd.items()}
     plot_df = pd.DataFrame(concat_dd)
 
@@ -253,3 +244,36 @@ def export_plot(name, panel_plot):
     export_path = utils.get_export_path()
     path = f"{export_path}/{name}"
     panel_plot.savefig(path)
+
+
+def generate_figure_1():
+    read_df = utils.read_data()
+    df = pre_process_data(df=read_df)
+
+    dependent_ls = [
+        "a_symptom",
+        "tot_hhspend",
+        "tot_exp_w",
+        "hours_hired",
+        "costs_nw_w",
+        "REVnw_w",
+    ]
+
+    kwargs_dd = {
+        "df": df,
+        "tau": "tau",
+        "treatment": "Treatment",
+        "clustvar": "id",
+        "fe": ["id", "month"],
+        "control": ["Nm", "Nf", "headage", "mean_edu"],
+    }
+
+    result_dd = {dv: regress_diff_in_diff(dv=dv, **kwargs_dd) for dv in dependent_ls}
+    panel_plot = generate_plot(dependent_ls=dependent_ls, result_dd=result_dd)
+
+    name = "figure_1.pdf"
+    export_plot(name=name, panel_plot=panel_plot)
+
+
+def main():
+    generate_figure_1()

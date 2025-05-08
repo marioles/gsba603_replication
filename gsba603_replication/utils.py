@@ -17,6 +17,8 @@ def calculate_outcomes(df):
     df["REVnw_w"] = df["AgREV_w"].add(df["LREV_w"], fill_value=0)
     df["REVnw_w"] = df["REVnw_w"].add(df["FSREV_w"], fill_value=0)
     df["REVnw_w"] = df["REVnw_w"].add(df["BREV_w"], fill_value=0)
+
+    df["a_symptom"] = df["n_symptom"].apply(lambda x: 1 if x > 0 else 0)
     return df
 
 
@@ -65,3 +67,10 @@ def read_data():
     path = get_treat_file_path()
     raw_df = pd.read_stata(path)
     return raw_df
+
+
+def filter_first_half_shock(df):
+    treatment_filter_ss = df["treatment_subsample"] == 1
+    treatment_filter_ss = treatment_filter_ss | (df["placebo_subsample"] == 2)
+    treatment_filter_df = df.loc[treatment_filter_ss].copy()
+    return treatment_filter_df
