@@ -1,5 +1,7 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import scipy as sp
 import statsmodels.formula.api as smf
 
 from . import utils
@@ -69,7 +71,7 @@ def pre_process_data(df):
     return keep_df
 
 
-def regress_diff_in_diff(df, dv, tau, h, fe=None, fe_inter=None, control=None, clustvar=None):
+def regress_diff_in_diff(df, dv, tau, h, fe=None, fe_inter=None, control=None, clustvar=None, cluster=False):
     copy_df = df.copy()
 
     iter_ls = [
@@ -138,10 +140,148 @@ def regress_diff_in_diff(df, dv, tau, h, fe=None, fe_inter=None, control=None, c
     model = smf.ols(formula, data=copy_df)
     results = model.fit()
 
-    cluster_1, cluster_2 = clustvar
-    cluster_1_ss = copy_df[cluster_1].copy()
-    cluster_2_ss = copy_df[cluster_2].copy()
-    covariance = utils.cov_cluster_2way(model=results, cluster1=cluster_1_ss, cluster2=cluster_2_ss)
-    results.clustered_bse = np.sqrt(np.diag(covariance))
+    if cluster:
+        cluster_1, cluster_2 = clustvar
+        cluster_1_ss = copy_df[cluster_1].copy()
+        cluster_2_ss = copy_df[cluster_2].copy()
+        covariance = utils.cov_cluster_2way(model=results, cluster1=cluster_1_ss, cluster2=cluster_2_ss)
+        results.clustered_bse = np.sqrt(np.diag(covariance))
 
     return results
+
+
+def get_regex():
+    regex_str = r"^C\(tau_cat, Treatment\(reference=-1\)\)\[T\.(.*?)\]:close_tot$"
+    return regex_str
+
+
+def get_title(dv):
+    title_dd = {
+        "transactions": "Panel A. Total transactions\nTransactions",
+        "OUTPUT": "Panel B. Supply-chain (sales) network transactions\nNumber of transactions (output/input)",
+        "HLAB": "Panel C. Labor network transactions\nNumber of transactions (labor markets)",
+        "tincome_w": "Panel D. Total income\nNet income",
+        "exp_w": "Panel E. Consumption spending\nConsumption spending",
+    }
+    title = title_dd[dv]
+    return title
+
+
+def get_x_title(dv):
+    x_title = "Time to event (half year)"
+    return x_title
+
+
+def get_y_title(dv):
+    y_title_dd = {
+        "transactions": "Number links",
+        "OUTPUT": "Number links",
+        "HLAB": "Number links",
+        "tincome_w": "THB",
+        "exp_w": "THB",
+    }
+    y_title = y_title_dd[dv]
+    return y_title
+
+
+def plot_from_data(ax, plot_df, dv, confidence_ls):
+    title = get_title(dv=dv)
+    x_title = get_x_title(dv=dv)
+    y_title = get_y_title(dv=dv)
+
+    x_ss = plot_df.index
+    y_ss = plot_df["coefficient"]
+
+    ax.plot(x_ss, y_ss, marker="o", linewidth=2, label="Coef")
+
+    for confidence in confidence_ls:
+        lower_label = f"lower_{int(100 * confidence)}"
+        upper_label = f"upper_{int(100 * confidence)}"
+        lower_ss = plot_df[lower_label]
+        upper_ss = plot_df[upper_label]
+        plot_label = f"{int(100 * confidence)}% CI"
+        plot_color = utils.get_confidence_color(confidence)
+        ax.fill_between(x_ss, lower_ss, upper_ss, color=plot_color, alpha=0.25, label=plot_label)
+
+    ax.axhline(0, color="maroon", linestyle="--")
+    ax.axvline(-1, color="maroon", linestyle="--")
+
+    ax.set_title(title)
+    ax.set_xlabel(x_title)
+    ax.set_ylabel(y_title)
+    ax.legend()
+    ax.grid(True)
+
+
+def generate_sub_plot(ax, dv, result):
+    regex_str = get_regex()
+
+    raw_dd = {
+        "coefficient": result.params,
+        "std_error": result.bse,
+    }
+
+    extract_dd = {k: utils.extract_relevant_values(ss=ss, regex_str=regex_str) for k, ss in raw_dd.items()}
+    concat_dd = {k: utils.append_baseline(ss=ss) for k, ss in extract_dd.items()}
+    plot_df = pd.DataFrame(concat_dd)
+
+    confidence_ls = utils.get_confidence_list()
+    for confidence in confidence_ls:
+        interval = (1 - confidence) / 2 + confidence
+        critical_value = sp.stats.norm.ppf(interval)
+        lower_label = f"lower_{int(100 * confidence)}"
+        upper_label = f"upper_{int(100 * confidence)}"
+        plot_df[lower_label] = plot_df["coefficient"] - critical_value * plot_df["std_error"]
+        plot_df[upper_label] = plot_df["coefficient"] + critical_value * plot_df["std_error"]
+
+    plot_from_data(ax=ax, plot_df=plot_df, dv=dv, confidence_ls=confidence_ls)
+
+
+def generate_plot(dependent_ls, result_dd):
+    fig, axes = plt.subplots(3, 2, figsize=(14, 10))
+    axes = axes.flatten()
+
+    iterate_ls = zip(dependent_ls, axes[-1])
+    for dv, ax in iterate_ls:
+        result = result_dd[dv]
+        generate_sub_plot(ax=ax, dv=dv, result=result)
+
+    plt.tight_layout()
+    return fig
+
+
+def generate_figure_2(cluster=None):
+    if cluster is None:
+        cluster = False
+
+    read_df = utils.read_data(file="dyads_es_max")
+    df = pre_process_data(df=read_df)
+
+    dependent_ls = [
+        "transactions",
+        "OUTPUT",
+        "HLAB",
+        "tincome_w",
+        "exp_w",
+    ]
+
+    kwargs_dd = {
+        "df": df,
+        "tau": "tau",
+        "h": "close_tot",
+        "clustvar": ["id", "id_j"],
+        "fe": ["id", "month"],
+        "fe_inter": [("_degree_Tot_t", "month")],
+        "control": ["Nm", "Nf", "headage", "mean_edu"],
+        "cluster": cluster,
+    }
+
+    result_dd = {dv: regress_diff_in_diff(dv=dv, **kwargs_dd) for dv in dependent_ls}
+    panel_plot = generate_plot(dependent_ls=dependent_ls, result_dd=result_dd)
+
+    name = "figure_2.pdf"
+    utils.export_plot(name=name, panel_plot=panel_plot)
+
+
+def main(cluster=None):
+    generate_figure_2(cluster=cluster)

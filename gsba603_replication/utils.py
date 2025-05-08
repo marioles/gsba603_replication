@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import re
 
 from statsmodels.stats.sandwich_covariance import cov_cluster
 
@@ -115,3 +116,45 @@ def cov_cluster_2way(model, cluster1, cluster2):
     cov2 = cov_cluster(model, cluster2)
     cov12 = cov_cluster(model, [f"{i}_{j}" for i, j in zip(cluster1, cluster2)])  # intersection
     return cov1 + cov2 - cov12
+
+
+def extract_relevant_values(ss, regex_str):
+    filter_ss = ss.filter(regex=regex_str, axis=0)
+    index_ls = list(filter_ss.index)
+    reindex_ls = [re.match(regex_str, i).group(1) for i in index_ls]
+    reindex_ls = [int(i) for i in reindex_ls]
+    filter_ss.index = reindex_ls
+    return filter_ss
+
+
+def append_baseline(ss):
+    append_ss = get_append_series()
+    concat_ls = [append_ss, ss]
+    concat_ss = pd.concat(concat_ls, axis=0)
+    sort_ss = concat_ss.sort_index()
+    return sort_ss
+
+
+def get_append_series():
+    ss = pd.Series(0, index=[-1], dtype=float)
+    return ss
+
+
+def get_confidence_list():
+    confidence_ls = [0.95, 0.9]
+    return confidence_ls
+
+
+def get_confidence_color(confidence):
+    confidence_color_dd = {
+        0.90: "black",
+        0.95: "gray",
+    }
+    color = confidence_color_dd[confidence]
+    return color
+
+
+def export_plot(name, panel_plot):
+    export_path = get_export_path()
+    path = f"{export_path}/{name}"
+    panel_plot.savefig(path)

@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import pandas as pd
-import re
 import scipy as sp
 import statsmodels.formula.api as smf
 
@@ -89,31 +88,9 @@ def regress_diff_in_diff(df, dv, tau, treatment, fe=None, control=None, clustvar
     return results
 
 
-def get_append_series():
-    ss = pd.Series(0, index=[-1], dtype=float)
-    return ss
-
-
 def get_regex():
     regex_str = r"^C\(tau_cat, Treatment\(reference=-1\)\)\[T\.(.*?)\]:treatment$"
     return regex_str
-
-
-def extract_relevant_values(ss, regex_str):
-    filter_ss = ss.filter(regex=regex_str, axis=0)
-    index_ls = list(filter_ss.index)
-    reindex_ls = [re.match(regex_str, i).group(1) for i in index_ls]
-    reindex_ls = [int(i) for i in reindex_ls]
-    filter_ss.index = reindex_ls
-    return filter_ss
-
-
-def append_baseline(ss):
-    append_ss = get_append_series()
-    concat_ls = [append_ss, ss]
-    concat_ss = pd.concat(concat_ls, axis=0)
-    sort_ss = concat_ss.sort_index()
-    return sort_ss
 
 
 def get_title(dv):
@@ -147,15 +124,6 @@ def get_y_title(dv):
     return y_title
 
 
-def get_confidence_color(confidence):
-    confidence_color_dd = {
-        0.90: "black",
-        0.95: "gray",
-    }
-    color = confidence_color_dd[confidence]
-    return color
-
-
 def plot_from_data(ax, plot_df, dv, confidence_ls):
     title = get_title(dv=dv)
     x_title = get_x_title(dv=dv)
@@ -172,7 +140,7 @@ def plot_from_data(ax, plot_df, dv, confidence_ls):
         lower_ss = plot_df[lower_label]
         upper_ss = plot_df[upper_label]
         plot_label = f"{int(100 * confidence)}% CI"
-        plot_color = get_confidence_color(confidence)
+        plot_color = utils.get_confidence_color(confidence)
         ax.fill_between(x_ss, lower_ss, upper_ss, color=plot_color, alpha=0.25, label=plot_label)
 
     ax.axhline(0, color="maroon", linestyle="--")
@@ -185,11 +153,6 @@ def plot_from_data(ax, plot_df, dv, confidence_ls):
     ax.grid(True)
 
 
-def get_confidence_list():
-    confidence_ls = [0.95, 0.9]
-    return confidence_ls
-
-
 def generate_sub_plot(ax, dv, result):
     regex_str = get_regex()
 
@@ -198,11 +161,11 @@ def generate_sub_plot(ax, dv, result):
         "std_error": result.bse,
     }
 
-    extract_dd = {k: extract_relevant_values(ss=ss, regex_str=regex_str) for k, ss in raw_dd.items()}
-    concat_dd = {k: append_baseline(ss=ss) for k, ss in extract_dd.items()}
+    extract_dd = {k: utils.extract_relevant_values(ss=ss, regex_str=regex_str) for k, ss in raw_dd.items()}
+    concat_dd = {k: utils.append_baseline(ss=ss) for k, ss in extract_dd.items()}
     plot_df = pd.DataFrame(concat_dd)
 
-    confidence_ls = get_confidence_list()
+    confidence_ls = utils.get_confidence_list()
     for confidence in confidence_ls:
         interval = (1 - confidence) / 2 + confidence
         critical_value = sp.stats.norm.ppf(interval)
@@ -225,12 +188,6 @@ def generate_plot(dependent_ls, result_dd):
 
     plt.tight_layout()
     return fig
-
-
-def export_plot(name, panel_plot):
-    export_path = utils.get_export_path()
-    path = f"{export_path}/{name}"
-    panel_plot.savefig(path)
 
 
 def generate_figure_1():
@@ -259,7 +216,7 @@ def generate_figure_1():
     panel_plot = generate_plot(dependent_ls=dependent_ls, result_dd=result_dd)
 
     name = "figure_1.pdf"
-    export_plot(name=name, panel_plot=panel_plot)
+    utils.export_plot(name=name, panel_plot=panel_plot)
 
 
 def main():
