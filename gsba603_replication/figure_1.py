@@ -6,15 +6,18 @@ import statsmodels.formula.api as smf
 from . import utils
 
 
-def pre_process_data(df):
+def pre_process_data(df, months=None):
+    if months is None:
+        months = 24
+
     # Two-year analysis window
-    window_filter_df = utils.filter_window(df=df, months=24)
+    window_filter_df = utils.filter_window(df=df, months=months)
 
     # Observations hit during first half but not yet treated
     treatment_filter_df = utils.filter_first_half_shock(df=window_filter_df)
 
     # Recode tau
-    recode_df = utils.recode_tau(df=treatment_filter_df)
+    recode_df = utils.recode_tau(df=treatment_filter_df, months=months)
 
     # No-attrition filter
     filter_df = utils.filter_attrition(df=recode_df)
@@ -223,9 +226,12 @@ def construct_kwargs_dict(df):
     return kwargs_dd
 
 
-def generate_figure_1():
+def generate_figure_1(months=None, name=None):
+    if name is None:
+        name = "figure_1.pdf"
+
     read_df = utils.read_data()
-    df = pre_process_data(df=read_df)
+    df = pre_process_data(df=read_df, months=months)
 
     dependent_ls = get_dependent_list()
     kwargs_dd = construct_kwargs_dict(df=df)
@@ -233,7 +239,6 @@ def generate_figure_1():
     result_dd = {dv: regress_diff_in_diff(dv=dv, **kwargs_dd) for dv in dependent_ls}
     panel_plot = generate_plot(dependent_ls=dependent_ls, result_dd=result_dd)
 
-    name = "figure_1.pdf"
     utils.export_plot(name=name, panel_plot=panel_plot)
 
 

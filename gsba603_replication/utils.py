@@ -98,11 +98,20 @@ def filter_first_half_shock(df):
     return treatment_filter_df
 
 
-def recode_tau(df):
+def recode_tau(df, months=None):
+    if months is None:
+        months = 24
+
     recode_df = df.copy()
 
-    bin_ls = [-25, -18, -12, -6, 0, 6, 12, 18, 24]
-    label_ls = [-4, -3, -2, -1, 0, 1, 2, 3]
+    step = 6
+    distance = int(months / step)
+    bins = int(2 * distance + 1)
+    bin_ls = [months - i * step for i in range(bins)]
+    bin_ls.reverse()
+    bin_ls[0] += -1
+
+    label_ls = [i for i in range(-distance, distance)]
 
     tau_ss = recode_df["tau"].copy()
     recode_df["ttt"] = tau_ss
