@@ -241,7 +241,7 @@ def generate_plot(dependent_ls, result_dd):
     fig, axes = plt.subplots(3, 2, figsize=(14, 10))
     axes = axes.flatten()
 
-    iterate_ls = zip(dependent_ls, axes[-1])
+    iterate_ls = zip(dependent_ls, axes)
     for dv, ax in iterate_ls:
         result = result_dd[dv]
         generate_sub_plot(ax=ax, dv=dv, result=result)
