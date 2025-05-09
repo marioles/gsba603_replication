@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 from . import figure_1, utils
@@ -18,6 +19,23 @@ def _format_series(dv, ss, seed):
 
 def get_subsample_coefficient(df, seed, dependent_ls, regress_kwargs_dd):
     sample_df = df.sample(frac=0.8, random_state=seed)
+
+    regress_kwargs_dd.update({"df": sample_df})
+    result_dd = {dv: figure_1.regress_diff_in_diff(dv=dv, **regress_kwargs_dd) for dv in dependent_ls}
+    coef_dd = {dv: extract_coefficient_from_result(result=result) for dv, result in result_dd.items()}
+    return coef_dd
+
+
+def get_placebo_coefficient(df, seed, dependent_ls, regress_kwargs_dd):
+    np.random.seed(seed)
+    sample_df = df.copy()
+    treatment = regress_kwargs_dd["treatment"]
+    treatment_ss = sample_df[treatment].copy()
+    index_ls = treatment_ss.index
+    randomize_ss = np.random.choice(df.index, size=len(index_ls), replace=False)
+    placebo_ss = treatment_ss.loc[randomize_ss].copy()
+    placebo_ss.index = index_ls
+    sample_df[treatment] = placebo_ss
 
     regress_kwargs_dd.update({"df": sample_df})
     result_dd = {dv: figure_1.regress_diff_in_diff(dv=dv, **regress_kwargs_dd) for dv in dependent_ls}
@@ -74,5 +92,43 @@ def run_bootstrap(n_bootstrap=None):
     utils.export_plot(name=name, panel_plot=panel_plot)
 
 
-def main(n_bootstrap=None):
+def expand_window():
+    months = 36
+    name = "figure_1_36months.pdf"
+    figure_1.generate_figure_1(months=months, name=name)
+
+
+def run_placebo_test(n_bootstrap=None):
+    if n_bootstrap is None:
+        n_bootstrap = 100
+
+    read_df = utils.read_data()
+    df = figure_1.pre_process_data(df=read_df)
+
+    dependent_ls = figure_1.get_dependent_list()
+    kwargs_dd = figure_1.construct_kwargs_dict(df=df)
+
+    bootstrap_dd = {
+        "df": df,
+        "dependent_ls": dependent_ls,
+        "regress_kwargs_dd": kwargs_dd,
+    }
+
+    seed_ls = list(range(n_bootstrap))
+    coef_ls = [get_placebo_coefficient(seed=seed, **bootstrap_dd) for seed in seed_ls]
+    coef_dd = {dv: [i[dv] for i in coef_ls] for dv in dependent_ls}
+    stats_dd = {dv: get_stats(ls) for dv, ls in coef_dd.items()}
+    panel_plot = generate_robustness_plot(dependent_ls=dependent_ls, result_dd=stats_dd)
+
+    name = "figure_1_placebo.pdf"
+    utils.export_plot(name=name, panel_plot=panel_plot)
+
+
+def run_robustness_checks(n_bootstrap=None):
     run_bootstrap(n_bootstrap=n_bootstrap)
+    expand_window()
+    run_placebo_test(n_bootstrap=n_bootstrap)
+
+
+def main(n_bootstrap=None):
+    run_robustness_checks(n_bootstrap=n_bootstrap)
